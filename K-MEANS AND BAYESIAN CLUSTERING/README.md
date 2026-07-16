@@ -6,9 +6,9 @@ Unsupervised Learning (clustering) on a Spotify dataset using:
 - Bayesian Mixture Model for Clustering
 
 # Contents
-Progetto Bayesiana.R
+Progetto_Bayesiana.R
 Report.pdf (Italian)
-
+spotify_songs.csv
 
 # Language
 R
