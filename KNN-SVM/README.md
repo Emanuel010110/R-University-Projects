@@ -6,7 +6,8 @@ Classification of the Saturn dataset using:
 - Support Vector Machines (SVM)
 
 # Contents
-- Saturn.R (R code)
+- Saturn.R
+- Saturn_dataset.RDS
 - report.pdf
 
 # Language
