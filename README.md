@@ -5,7 +5,6 @@ This repository contains university projects developed in R.
 - Machine Learning
 - Statistical Learning
 - Econometrics
-- Time Series
 - Data Visualization
 
 Each folder contains:
