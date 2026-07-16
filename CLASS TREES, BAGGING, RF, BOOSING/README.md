@@ -11,6 +11,7 @@ Classify customers as good or bad risks (German Credit dataset) using:
 # Contents
 - Progetto_Statistical_Learning.Rmd 
 - german.data (German Credit dataset)
+- german.doc (Attributes description)
 
 # Language
 R
