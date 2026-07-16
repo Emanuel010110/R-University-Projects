@@ -1,4 +1,4 @@
-# KNN & SVM
+# KNN & SVM (MACHINE LEARNING COURSE)
 
 # Objective
 Classification of the Saturn dataset using:
