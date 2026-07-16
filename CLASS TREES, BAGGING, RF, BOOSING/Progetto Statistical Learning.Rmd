@@ -1,0 +1,377 @@
+---
+title: "German Credit Risk Classification using Tree-Based Methods"
+author: "Emanuel Tafani"
+date: "2026-03-20"
+output: html_document
+---
+
+```{r setup, include=FALSE}
+knitr::opts_chunk$set(echo = TRUE)
+```
+
+1. INTRODUCTION
+
+The aim of this project is to classify customers as good or bad credit risks using the German Credit dataset present in the UCI Machine Learning Repository.
+The dataset contains both numerical and categorical variables describing financial and personal characteristics of customers.
+
+Tree-based methods are well suited for this type of data, as they can naturally handle both categorical and numerical predictors without requiring excessive preprocessing.
+
+The following models are considered: single decision Tree, Bagging, Random Forest and Boosting.
+
+
+2. DATA LOADING AND PREPROCESSING
+
+```{r}
+cr <- read.table("german.data", header = F)
+colnames(cr)[colnames(cr) == "V21"] <- "Classe"
+
+str(cr) # Variabili 
+qualitative_vars <- c(1,3,4,6,7,9,10,12,14,15,17,19,20,21)
+cr[qualitative_vars] <- lapply(cr[qualitative_vars], as.factor)
+str(cr) # Variabili qualitative trasformate in "Factor"
+summary(cr$Classe)  # 1=GOOD, 2=BAD
+
+cr$V7 <- ordered(cr$V7,
+                     levels = c("A71","A72","A73","A74","A75"))
+#Attribute 7:  (qualitative)
+#Present employment since
+#A71 : unemployed
+#A72 :       ... < 1 year
+#A73 : 1  <= ... < 4 years  
+#A74 : 4  <= ... < 7 years
+#A75 :       .. >= 7 years
+
+cr$V17 <- ordered(cr$V17,
+                      levels = c("A171","A172","A173","A174"))
+#Attribute 17: (qualitative)
+#Job
+#A171 : unemployed/ unskilled  - non-resident
+#A172 : unskilled - resident
+#A173 : skilled employee / official
+#A174 : management/ self-employed/
+#  highly qualified employee/ officer
+
+str(cr) # Le due variabili sono ora "Ordered Factor"
+summary(cr$Classe) 
+
+```
+
+Qualitative variables are converted into factors. Some of these have an ordinal nature so have been defined as ordered factors.
+
+
+3. TRAIN-TEST SPLIT
+
+The dataset is split into a training set (70%) and a test set (30%).
+
+```{r}
+set.seed(2)
+
+n_cr <- nrow(cr)
+train_idx_cr <- sample(1:n_cr, size = floor(0.7 * n_cr))
+
+cr_train <- cr[train_idx_cr, ]
+cr_test  <- cr[-train_idx_cr, ]
+
+y_test_cr <- cr_test$Classe
+
+summary(cr_train$Classe)
+summary(cr_test$Classe)
+
+```
+
+
+4. DECISION TREE
+
+First I implement a single classification tree on the training data and evaluate its performance on the test data.
+
+```{r}
+set.seed(2)
+library(tree)    # Classification and regression trees
+tree_cr <- tree(Classe ~ .,
+                     data = cr_train)
+summary(tree_cr) # Numero di nodi terminali(Regioni/Foglie) = 14
+                 # Classification error rate sul training set = 0.1957
+                 # Variabili usate nella costruzione dell'albero
+                        # V1(Status del CC), V2(durata prestito in mesi)
+                        # V3(precedente storia creditizia),
+                        # V4(scopo del prestito), V5(importo creditizio   richiesto),
+                        # V6(risparmi o obbligazioni), V10(altri debitori/garanti),
+                        # V13(età), V14, V15(tipo di alloggio)
+plot(tree_cr)
+text(tree_cr, pretty = 0)
+
+
+pred_cr <- predict(tree_cr, newdata = cr_test, type = 'class')
+
+conf_mat_cr <- table(Predicted = pred_cr, Actual = y_test_cr)
+conf_mat_cr
+#             Actual
+# Predicted   1   2
+#         1 177  70
+#         2  19  34
+
+tree_accuracy <- mean(pred_cr == y_test_cr)
+tree_accuracy
+#[1] 0.7033333
+
+test_error_cr <- mean(pred_cr != y_test_cr)
+test_error_cr
+#[1] 0.2966667
+
+recall_bad_credit <- conf_mat_cr[2,2]/(conf_mat_cr[1,2]+conf_mat_cr[2,2])
+recall_bad_credit
+# 0.3269
+
+specificity <- conf_mat_cr[1,1]/(conf_mat_cr[1,1]+conf_mat_cr[2,1])
+specificity
+# 0.9031
+```
+
+The classification tree achieves an accuracy of about 70%.
+However, it has difficulty identifying bad credit risks, showing a low recall for the minority class.
+
+The problem are the 70 bad credits classified as good credit. 
+In credit scoring, this is the worst possible error.
+Let's consider "bad" (class 2) as a positive class.
+The sensitivity is about 32.7%.
+The tree intercepts only 32.7% of bad credits. Very low.
+Specificity is about 90%, which is very high. The tree is good at intercepting good credits.
+
+Let's see if techniques like Pruning, Bagging, Random Forest and Boosting can improve these values.
+
+
+5. PRUNING
+
+```{r}
+set.seed(123)
+cv <- cv.tree(tree_cr, FUN = prune.misclass)
+plot(cv$size, cv$dev, type = 'b',
+     xlab = 'Tree size',
+     ylab = 'CV misclassification error',
+     main = 'CV for classification tree (CR)')
+best_size_cr <- cv$size[which.min(cv$dev)]
+best_size_cr
+
+tree_cr_pruned <- prune.misclass(tree_cr, best = best_size_cr)
+plot(tree_cr_pruned)
+text(tree_cr_pruned, pretty = 0)
+
+pred_cr_pruned <- predict(tree_cr_pruned,
+                               newdata = cr_test,
+                               type = 'class')
+
+conf_mat_cr_pruned <- table(Predicted = pred_cr_pruned,
+                                 Actual    = y_test_cr)
+conf_mat_cr_pruned
+#                  Actual
+#         Predicted   1   2
+#                 1 178  70
+#                 2  18  34
+
+test_error_cr_pruned <- mean(pred_cr_pruned != y_test_cr)
+test_error_cr_pruned
+# 0.29 lievissimo miglioramento, quasi nullo.
+
+recall_bad_credit_pruned <- conf_mat_cr_pruned[2,2]/(conf_mat_cr_pruned[1,2]+conf_mat_cr_pruned[2,2])
+recall_bad_credit_pruned
+```
+
+Pruning slightly improves the model, but the improvement is limited.
+The sensitivity (Recall for bad credit) is about 33%. Very low.
+
+
+6. BAGGING
+```{r}
+set.seed(123)
+positive_class <- levels(cr$Classe)[2] # "bad"
+positive_class
+
+library(tree)         # single regression tree
+library(randomForest) # bagging / random forests
+
+p <- ncol(cr) - 1  # number of predictors (excluding classe)
+
+set.seed(1)
+bag_cr <- randomForest(
+  formula    = Classe ~ .,
+  data       = cr_train,
+  mtry       = p,       # all variables at each split -> bagging
+  ntree      = 1000,     # number of trees in the ensemble
+  importance = TRUE
+)
+
+bag_cr
+
+pred_cr_bag <- predict(bag_cr, newdata = cr_test, type = 'class')
+conf_mat_cr_bag <- table(Predicted = pred_cr_bag, Actual = y_test_cr)
+conf_mat_cr_bag
+#         Actual
+#Predicted   1   2
+#        1 169  56
+#        2  27  48
+
+tree_accuracy_bag <- mean(pred_cr_bag == y_test_cr)
+tree_accuracy_bag
+#[1] 0.7233333
+
+test_error_cr_bag <- mean(pred_cr_bag != y_test_cr)
+test_error_cr_bag
+#[1] 0.2766667
+
+recall_bad_credit_bag <- conf_mat_cr_bag[2,2]/(conf_mat_cr_bag[1,2]+conf_mat_cr_bag[2,2])
+recall_bad_credit_bag
+# 0.4615
+
+specificity_bag <- conf_mat_cr_bag[1,1]/(conf_mat_cr_bag[1,1]+conf_mat_cr_bag[2,1])
+specificity_bag
+# 0.8622
+
+
+importance(bag_cr)
+varImpPlot(bag_cr,
+           main = 'Variable importance (Bagging, cr data)')
+```
+
+Bagging improves the performance compared to the single decision tree.
+It increases the ability to correctly identify bad credit risks by reducing model variance.
+
+Recall(sensitivity) for bad is about 46.2%. 
+Before with the single decision tree, it was 32.7%. Huge improvement.
+Specificity is about 86%. Slightly worse than the tree, but still good. This model is catching more bad losing a bit on good.
+
+
+7. RANDOM FOREST
+
+```{r}
+p_rf <- floor(sqrt(p))
+p_rf
+
+set.seed(2)
+rf_cr <- randomForest(
+  formula    = Classe ~ .,
+  data       = cr_train,
+  mtry       = p_rf,
+  ntree      = 1000,
+  importance = TRUE
+)
+
+rf_cr
+
+pred_cr_rf <- predict(rf_cr, newdata = cr_test, type = 'class')
+conf_mat_cr_rf <- table(Predicted = pred_cr_rf, Actual = y_test_cr)
+conf_mat_cr_rf
+
+tree_accuracy_rf <- mean(pred_cr_rf == y_test_cr)
+tree_accuracy_rf
+#[1] 0.6933
+
+test_error_cr_rf <- mean(pred_cr_rf != y_test_cr)
+test_error_cr_rf
+#[1] 0.3067
+
+plot(rf_cr,
+     main = 'Random forest on CR data (OOB error vs number of trees)')
+# Aumentando gli alberi si assesta a circa 21.86%
+
+importance(rf_cr)
+varImpPlot(rf_cr,
+           main = 'Variable importance (Random forest, cr data)')
+
+```
+
+Random Forest does not outperform bagging in this case.
+
+
+8. TUNING mtry
+
+```{r}
+m_test <- c(4, 6, 8, 10, 15)
+
+rf_results <- c()
+
+for (m in m_test) {
+  
+  set.seed(2)
+  
+  rf_model <- randomForest(
+    Classe ~ .,
+    data = cr_train,
+    mtry = m,
+    ntree = 1000
+  )
+  
+  pred <- predict(rf_model, newdata = cr_test)
+  
+  rf_results <- c(rf_results, mean(pred == y_test_cr))
+}
+
+data.frame(mtry = m_test, accuracy = rf_results) # Tende all'accuracy del Bagging
+
+```
+
+Increasing the number of predictors considered at each split improves performance and makes the model closer to Bagging.
+
+
+9. BOOSTING
+
+```{r}
+library(adabag)
+
+set.seed(123)
+
+boost_cr <- boosting(
+  Classe ~ .,
+  data    = cr_train,
+  boos    = TRUE,
+  mfinal  = 100,
+  control = rpart.control(cp = 0.01,
+                          minsplit = 3)
+)
+
+#------------------
+
+pred_cr_boost <- predict(boost_cr, newdata = cr_test)
+names(pred_cr_boost)
+
+conf_mat_cr_boost <- table(Predicted = pred_cr_boost$class,
+                          Actual    = cr_test$Classe)
+conf_mat_cr_boost
+#         Actual
+# Predicted   1   2
+#         1 157  51
+#         2  39  53
+
+accuracy_boost <- sum(diag(conf_mat_cr_boost)) / sum(conf_mat_cr_boost)
+accuracy_boost
+# 0.70
+
+recall_bad_credit_boost <- conf_mat_cr_boost[2,2]/(conf_mat_cr_boost[1,2]+conf_mat_cr_boost[2,2])
+recall_bad_credit_boost
+# 0.5096
+
+specificity_boost <- conf_mat_cr_boost[1,1]/(conf_mat_cr_boost[1,1]+conf_mat_cr_boost[2,1])
+specificity_boost
+# 0.80
+```
+
+Boosting manages to intercept half of the bad risks at the cost of lower specificity. 
+
+10. MODEL COMPARISON AND CONCLUSION
+```{r}
+data.frame(
+  Model = c("Tree","Bagging","Random Forest","Boosting"),
+  Accuracy = c(tree_accuracy,
+               tree_accuracy_bag,
+               tree_accuracy_rf,
+               accuracy_boost)
+)
+```
+
+Tree-based methods were applied to classify credit risk.
+The decision tree provides a baseline performance of around 70%.
+Bagging improves performance and provides the best results overall in this analysis.
+However, considering that intercepting bad credit is very important in credit scoring, we can say that Boosting is equally valid.
+
+Random Forest does not outperform bagging, likely due to the limited number of predictors.
+
+Overall, ensemble methods provide more stable predictions compared to a single decision tree.
