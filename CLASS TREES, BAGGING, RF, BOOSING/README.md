@@ -1,13 +1,16 @@
 # CLASSIFICATION TREES WITH BAGGING, RANDOM FOREST AND BOOSTING (STATISTICAL LEARNING COURSE)
 
 # Objective
-Classify customers as good or bad risks (German Credit dataset) using
+Classify customers as good or bad risks (German Credit dataset) using:
+- Single Classification Tree
+- Bagging
+- Random Forest
+- Boosting
 
 
 # Contents
-- Saturn.R
-- Saturn_dataset.RDS
-- report.pdf
+- Progetto Statistical Learning.Rmd (Italian)
+- german.data (German Credit dataset)
 
 # Language
 R
