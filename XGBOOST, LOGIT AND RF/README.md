@@ -7,7 +7,8 @@ Predict contraceptive use on Indian women dataset using:
 - XGBOOST
 
 # Contents
-- Progetto_Data_Mining.R 
+- Progetto_Data_Mining.R
+- Report.pdf 
 
 # Language
 R
